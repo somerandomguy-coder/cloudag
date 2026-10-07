@@ -5,10 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cloudag-engine
     restart: unless-stopped
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/cloudag.db
       - PYTHONUNBUFFERED=1
@@ -23,4 +22,3 @@ services:
 
 volumes:
   cloudag_data:
-    name: cloudag_data
