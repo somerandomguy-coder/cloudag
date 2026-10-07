@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  cloudag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cloudag-engine
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/cloudag.db
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - cloudag_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  cloudag_data:
+    name: cloudag_data
