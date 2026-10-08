@@ -15,7 +15,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy application source code
 COPY cloudag/ cloudag/
-COPY nexusflow/ nexusflow/
 COPY README.md .
 
 # Create directory for persistent SQLite database

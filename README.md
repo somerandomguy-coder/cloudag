@@ -52,7 +52,6 @@ cloudag/
 │   └── api/
 │       ├── __init__.py
 │       └── server.py          # FastAPI application for workflows, runs, and webhooks
-├── nexusflow/                 # Compatibility alias package for cloudag
 └── tests/
     ├── test_graph.py          # Cycle detection and topological ordering tests
     ├── test_interpolator.py   # Variable resolution and nested path tests
