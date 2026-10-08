@@ -56,6 +56,14 @@ def create_app(
     async def health_check():
         return {"status": "healthy", "service": "cloudag"}
 
+    from fastapi.responses import HTMLResponse
+    from cloudag.api.ui import HTML_PAGE
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    @app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
+    async def studio_ui():
+        return HTML_PAGE
+
     @app.post(
         "/api/v1/workflows",
         status_code=status.HTTP_201_CREATED,

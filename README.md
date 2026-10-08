@@ -147,3 +147,58 @@ Access Swagger UI documentation at `http://localhost:8000/docs`.
 ```bash
 docker compose up -d --build
 ```
+
+---
+
+## Interactive Web Studio UI
+
+`cloudag` includes a built-in visual Studio UI served directly at root `/` and `/ui`:
+
+- **Live Paste & Edit:** Paste any workflow JSON or select pre-configured presets (Hybrid DAG, Data Pipeline, Webhook).
+- **Execution Monitor:** Visual DAG node timeline displaying status (`PENDING`, `RUNNING`, `COMPLETED`, `CACHED`), millisecond execution metrics, and step-by-step output inspector.
+- **DAG Validator:** Test for cycles and invalid dependencies with a single click.
+
+---
+
+## Model Context Protocol (MCP) Server
+
+`cloudag` provides a native MCP server (`cloudag/mcp_server.py`) allowing AI assistants (Antigravity, Claude Desktop, Cursor) to manage workflows directly:
+
+### Available MCP Tools:
+- `cloudag_validate_workflow`: Check for cycles and compute topological waves.
+- `cloudag_register_workflow`: Register workflow definitions.
+- `cloudag_execute_workflow`: Run a workflow by ID with inputs.
+- `cloudag_run_workflow_direct`: Validate, register, and run workflow JSON in one call.
+- `cloudag_get_run_status`: Inspect status, timings, step outputs, and error traces.
+- `cloudag_resume_run`: Resume failed workflows from last checkpoint.
+- `cloudag_send_webhook`: Deliver external callback payloads.
+
+### Adding to Antigravity / Claude Desktop MCP Config:
+```json
+{
+  "mcpServers": {
+    "cloudag": {
+      "command": "python",
+      "args": ["-m", "cloudag.mcp_server"],
+      "env": {
+        "CLOUDAG_SERVER_URL": "http://localhost:8000"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Environment Variables & API Keys
+
+- **Deterministic Steps (`HTTP_DISPATCH`, `PYTHON_WORKER`, `DATA_TRANSFORM`):**
+  Require **no API keys** whatsoever.
+- **LLM Steps (`LLMAgentExecutor`):**
+  - **Offline/Test Mode:** Automatically synthesizes structured JSON matching your requested schema if no keys are provided.
+  - **Production Models:** Set any of the following environment variables in Coolify or `.env`:
+    - `OPENAI_API_KEY`: For OpenAI models (`gpt-4o`, `gpt-4o-mini`).
+    - `ANTHROPIC_API_KEY`: For Anthropic models (`claude-3-5-sonnet`).
+    - `GEMINI_API_KEY`: For Google Gemini models (`gemini-1.5-pro`).
+    - `DATABASE_URL`: Optional custom Postgres URL (`postgresql+asyncpg://...`). Default is SQLite.
+
