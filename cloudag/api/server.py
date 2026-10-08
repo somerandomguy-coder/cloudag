@@ -1,4 +1,5 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException, status
@@ -232,6 +233,65 @@ def create_app(
             "step_id": step_id,
             "message": "Webhook payload successfully dispatched to step.",
         }
+
+    @app.get("/api/v1/auth/status")
+    async def get_auth_status():
+        import shutil
+        from pathlib import Path
+        home = Path.home()
+        codex_auth = (home / ".codex" / "auth.json").exists()
+        gemini_auth = (home / ".gemini" / "google_accounts.json").exists()
+
+        return {
+            "codex": {
+                "installed": bool(shutil.which("codex")),
+                "authenticated": codex_auth,
+                "config_dir": str(home / ".codex"),
+            },
+            "gemini": {
+                "installed": bool(shutil.which("gemini")),
+                "authenticated": gemini_auth,
+                "config_dir": str(home / ".gemini"),
+            },
+            "antigravity": {
+                "installed": bool(shutil.which("agy") or shutil.which("gemini")),
+                "binary": "agy" if shutil.which("agy") else ("gemini" if shutil.which("gemini") else None),
+                "authenticated": gemini_auth,
+            },
+            "claude": {
+                "installed": bool(shutil.which("claude")),
+                "api_key_configured": bool(os.getenv("ANTHROPIC_API_KEY")),
+            },
+            "openai_api_key": bool(os.getenv("OPENAI_API_KEY")),
+            "gemini_api_key": bool(os.getenv("GEMINI_API_KEY")),
+        }
+
+    @app.post("/api/v1/auth/upload")
+    async def upload_auth(body: Dict[str, Any]):
+        """Upload credentials JSON for codex or gemini/antigravity directly."""
+        import json
+        from pathlib import Path
+
+        service = body.get("service")
+        data = body.get("data")
+        if not service or not data:
+            raise HTTPException(status_code=400, detail="Must provide 'service' and 'data'")
+
+        home = Path.home()
+        if service in ("codex", "chatgpt"):
+            target_dir = home / ".codex"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target_file = target_dir / "auth.json"
+            target_file.write_text(json.dumps(data, indent=2))
+            return {"status": "success", "message": f"Successfully updated {target_file}"}
+        elif service in ("gemini", "antigravity"):
+            target_dir = home / ".gemini"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target_file = target_dir / "google_accounts.json"
+            target_file.write_text(json.dumps(data, indent=2))
+            return {"status": "success", "message": f"Successfully updated {target_file}"}
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported service '{service}'")
 
     return app
 

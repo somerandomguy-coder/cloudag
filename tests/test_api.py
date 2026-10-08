@@ -155,3 +155,25 @@ async def test_api_not_found_handling(test_app):
 
         res_run = await client.get("/api/v1/runs/does_not_exist")
         assert res_run.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_auth_endpoints(test_app):
+    transport = ASGITransport(app=test_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Check auth status endpoint
+        res = await client.get("/api/v1/auth/status")
+        assert res.status_code == 200
+        data = res.json()
+        assert "codex" in data
+        assert "gemini" in data
+        assert "antigravity" in data
+
+        # Check upload endpoint
+        res_upload = await client.post(
+            "/api/v1/auth/upload",
+            json={"service": "codex", "data": {"auth_mode": "chatgpt"}},
+        )
+        assert res_upload.status_code == 200
+        assert res_upload.json()["status"] == "success"
+

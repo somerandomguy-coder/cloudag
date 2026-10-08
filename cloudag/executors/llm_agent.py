@@ -46,10 +46,10 @@ class LLMAgentExecutor(BaseExecutor):
         action_lower = step.action.lower()
         cli_harness = resolved_inputs.get("cli") or resolved_inputs.get("harness")
 
-        # 1. Check for CLI subscription harness (codex, chatgpt, claude, gemini, or cli:*)
+        # 1. Check for CLI subscription harness (codex, chatgpt, claude, gemini, antigravity, or cli:*)
         if (
             cli_harness
-            or action_lower in ("codex", "chatgpt", "claude", "claude-code", "gemini")
+            or action_lower in ("codex", "chatgpt", "claude", "claude-code", "gemini", "antigravity", "agy")
             or action_lower.startswith("cli:")
         ):
             target_harness = cli_harness or (
@@ -117,37 +117,64 @@ class LLMAgentExecutor(BaseExecutor):
         system_prompt: str,
         output_schema: Optional[Any],
     ) -> Dict[str, Any]:
-        """Executes prompt using local subscription CLI tools (codex, claude, gemini)."""
+        """Executes prompt using local subscription CLI tools (codex, claude, gemini, antigravity)."""
+        import tempfile
+
         full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
         if output_schema:
             full_prompt += f"\n\nFormat your response strictly as valid JSON matching schema: {json.dumps(output_schema)}"
 
-        harness_bin = "codex" if harness in ("codex", "chatgpt") else harness
+        harness_lower = harness.lower()
+        if harness_lower in ("codex", "chatgpt"):
+            harness_bin = "codex"
+        elif harness_lower in ("gemini", "antigravity", "agy"):
+            harness_bin = "agy" if shutil.which("agy") else "gemini"
+        elif harness_lower in ("claude", "claude-code"):
+            harness_bin = "claude"
+        else:
+            harness_bin = harness
+
         if not shutil.which(harness_bin):
             raise FileNotFoundError(f"CLI binary '{harness_bin}' is not installed or not in PATH.")
 
+        temp_output_path: Optional[str] = None
         cmd: List[str] = []
-        if harness in ("codex", "chatgpt"):
-            cmd = ["codex", "exec", full_prompt]
-        elif harness in ("claude", "claude-code"):
+
+        if harness_bin == "codex":
+            with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tf:
+                temp_output_path = tf.name
+            cmd = ["codex", "exec", "--ignore-user-config", "-o", temp_output_path, full_prompt]
+        elif harness_bin in ("agy", "gemini"):
+            cmd = [harness_bin, "-p", full_prompt]
+        elif harness_bin == "claude":
             cmd = ["claude", "-p", full_prompt]
-        elif harness == "gemini":
-            cmd = ["gemini", "-p", full_prompt]
         else:
-            cmd = [harness, full_prompt]
+            cmd = [harness_bin, full_prompt]
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await process.communicate()
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
 
-        if process.returncode != 0:
-            err_text = stderr.decode().strip()
-            raise RuntimeError(f"CLI harness '{harness}' exited with code {process.returncode}: {err_text}")
+            if process.returncode != 0:
+                err_text = stderr.decode().strip()
+                raise RuntimeError(f"CLI harness '{harness_bin}' exited with code {process.returncode}: {err_text}")
 
-        output_text = stdout.decode().strip()
+            output_text = ""
+            if temp_output_path and os.path.exists(temp_output_path):
+                with open(temp_output_path, "r", encoding="utf-8") as f:
+                    output_text = f.read().strip()
+            if not output_text:
+                output_text = stdout.decode().strip()
+        finally:
+            if temp_output_path and os.path.exists(temp_output_path):
+                try:
+                    os.remove(temp_output_path)
+                except OSError:
+                    pass
 
         parsed_json = self._extract_json(output_text)
         if parsed_json is not None:
@@ -155,7 +182,7 @@ class LLMAgentExecutor(BaseExecutor):
 
         return {
             "content": output_text,
-            "harness": harness,
+            "harness": harness_bin,
             "status": "success",
         }
 
